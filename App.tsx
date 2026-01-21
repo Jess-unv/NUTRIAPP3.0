@@ -1,9 +1,10 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { StyleSheet } from 'react-native';
+import { View, ActivityIndicator } from 'react-native';
 import { PointsProvider } from './src/context/PointsContext';
 import { ProfileImageProvider } from './src/context/ProfileImageContext';
+import { AuthProvider, useAuth } from './src/context/AuthContext';
 
 // Pantallas
 import LoginScreen from './src/screens/LoginScreen';
@@ -20,27 +21,46 @@ import PhotoSelectionScreen from './src/screens/PhotoSelectionScreen';
 
 const Stack = createStackNavigator();
 
+// Componente para manejar la navegación basada en autenticación
 const AppNavigator = () => {
+  const { session, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#2E8B57" />
+      </View>
+    );
+  }
+
   return (
     <NavigationContainer>
-      <Stack.Navigator 
-        initialRouteName="Login"
-        // Esta opción quita la barra superior de TODAS las pantallas
+      <Stack.Navigator
         screenOptions={{
-          headerShown: false, 
+          headerShown: false,
         }}
       >
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="Dashboard" component={DashboardScreen} />
-        <Stack.Screen name="Points" component={PointsScreen} />
-        <Stack.Screen name="Schedule" component={ScheduleScreen} />
-        <Stack.Screen name="Calendar" component={CalendarScreen} />
-        <Stack.Screen name="MyDiet" component={MyDietScreen} />
-        <Stack.Screen name="MyRoutines" component={MyRoutinesScreen} />
-        <Stack.Screen name="Calories" component={CaloriesScreen} />
-        <Stack.Screen name="FoodTracking" component={FoodTrackingScreen} />
-        <Stack.Screen name="Profile" component={ProfileScreen} />
-        <Stack.Screen name="PhotoSelection" component={PhotoSelectionScreen} />
+        {session ? (
+          // Usuario autenticado
+          <>
+            <Stack.Screen name="Dashboard" component={DashboardScreen} />
+            <Stack.Screen name="Points" component={PointsScreen} />
+            <Stack.Screen name="Schedule" component={ScheduleScreen} />
+            <Stack.Screen name="Calendar" component={CalendarScreen} />
+            <Stack.Screen name="MyDiet" component={MyDietScreen} />
+            <Stack.Screen name="MyRoutines" component={MyRoutinesScreen} />
+            <Stack.Screen name="Calories" component={CaloriesScreen} />
+            <Stack.Screen name="FoodTracking" component={FoodTrackingScreen} />
+            <Stack.Screen name="Profile" component={ProfileScreen} />
+            <Stack.Screen name="PhotoSelection" component={PhotoSelectionScreen} />
+          </>
+        ) : (
+          // Usuario no autenticado
+          <>
+            <Stack.Screen name="Login" component={LoginScreen} />
+            {/* Puedes agregar otras pantallas públicas aquí si es necesario */}
+          </>
+        )}
       </Stack.Navigator>
     </NavigationContainer>
   );
@@ -48,10 +68,12 @@ const AppNavigator = () => {
 
 export default function App() {
   return (
-    <PointsProvider>
-      <ProfileImageProvider>
-        <AppNavigator />
-      </ProfileImageProvider>
-    </PointsProvider>
+    <AuthProvider>
+      <PointsProvider>
+        <ProfileImageProvider>
+          <AppNavigator />
+        </ProfileImageProvider>
+      </PointsProvider>
+    </AuthProvider>
   );
 }

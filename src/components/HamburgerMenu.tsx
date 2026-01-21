@@ -9,6 +9,8 @@ import {
   I18nManager,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../context/AuthContext';
+import { useUser } from '../hooks/useUser'; // Importamos el hook de usuario
 
 const { width } = Dimensions.get('window');
 
@@ -31,6 +33,8 @@ interface HamburgerMenuProps {
 }
 
 export default function HamburgerMenu({ isVisible, onClose, navigation }: HamburgerMenuProps) {
+  const { signOut, user: authUser } = useAuth();
+  const { user: userData, loading: userLoading } = useUser(); // Obtenemos datos del usuario
   const slideAnim = React.useRef(new Animated.Value(-width)).current;
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
   
@@ -84,6 +88,12 @@ export default function HamburgerMenu({ isVisible, onClose, navigation }: Hambur
     setTimeout(() => navigation.navigate(screenName), 300);
   };
 
+  const handleLogout = async () => {
+    animateClose();
+    await signOut();
+    // La navegación se manejará automáticamente por el AppNavigator
+  };
+
   const animateClose = () => {
     Animated.parallel([
       Animated.timing(slideAnim, {
@@ -108,6 +118,26 @@ export default function HamburgerMenu({ isVisible, onClose, navigation }: Hambur
     { icon: 'nutrition-outline', name: 'Registrar Alimentos', screen: 'FoodTracking' },
   ];
 
+  // Obtener nombre del usuario para mostrar
+  const getUserName = () => {
+    if (userData) {
+      return `${userData.nombre || ''} ${userData.apellido || ''}`.trim() || 'Usuario Nutri U';
+    }
+    return authUser?.email?.split('@')[0] || 'Usuario Nutri U';
+  };
+
+  // Obtener estado premium basado en puntos o rol
+  const getUserStatus = () => {
+    if (userData) {
+      if (userData.rol === 'nutriologo' || userData.rol === 'admin') {
+        return 'Nutriólogo';
+      }
+      // Podrías verificar puntos para determinar si es premium
+      return 'Usuario Activo';
+    }
+    return 'Premium Activo';
+  };
+
   if (!isVisible) return null;
 
   return (
@@ -130,14 +160,25 @@ export default function HamburgerMenu({ isVisible, onClose, navigation }: Hambur
           </TouchableOpacity>
         </View>
 
-        {/* Sección de usuario (Simple y Pro) */}
+        {/* Sección de usuario con datos reales */}
         <View style={styles.userSection}>
           <View style={styles.userAvatar}>
-             <Ionicons name="person" size={24} color={COLORS.primary} />
+            {userData?.foto_perfil ? (
+              <Ionicons name="person" size={24} color={COLORS.primary} />
+            ) : (
+              <Ionicons name="person" size={24} color={COLORS.primary} />
+            )}
           </View>
           <View>
-            <Text style={styles.userName}>Usuario Nutri U</Text>
-            <Text style={styles.userStatus}>Premium Activo</Text>
+            <Text style={styles.userName} numberOfLines={1}>
+              {getUserName()}
+            </Text>
+            <Text style={styles.userStatus}>{getUserStatus()}</Text>
+            {authUser?.email && (
+              <Text style={styles.userEmail} numberOfLines={1}>
+                {authUser.email}
+              </Text>
+            )}
           </View>
         </View>
 
@@ -179,7 +220,7 @@ export default function HamburgerMenu({ isVisible, onClose, navigation }: Hambur
         <View style={styles.menuFooter}>
           <TouchableOpacity 
             style={styles.logoutButton} 
-            onPress={() => handleMenuNavigation('Login')}
+            onPress={handleLogout}
           >
             <Ionicons name="log-out-outline" size={20} color={COLORS.danger} />
             <Text style={styles.logoutText}>Cerrar Sesión</Text>
@@ -246,8 +287,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(46, 139, 87, 0.2)',
   },
-  userName: { fontSize: 16, fontWeight: '700', color: COLORS.textDark },
-  userStatus: { fontSize: 11, color: COLORS.primary, fontWeight: '600' },
+  userName: { 
+    fontSize: 16, 
+    fontWeight: '700', 
+    color: COLORS.textDark,
+    maxWidth: 180,
+  },
+  userStatus: { 
+    fontSize: 11, 
+    color: COLORS.primary, 
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  userEmail: {
+    fontSize: 10,
+    color: COLORS.textLight,
+    marginTop: 2,
+    maxWidth: 180,
+  },
 
   menuItemsList: { flex: 1, paddingHorizontal: 15 },
   menuItem: {

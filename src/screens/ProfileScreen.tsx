@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,12 +7,12 @@ import {
   ScrollView,
   SafeAreaView,
   StatusBar,
-  Dimensions
+  TouchableOpacity,
+  ActivityIndicator
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { usePoints } from '../context/PointsContext';
-
-const { width } = Dimensions.get('window');
+import { useUser } from '../hooks/useUser';
+import { useAuth } from '../context/AuthContext';
 
 const COLORS = {
   primary: '#2E8B57',
@@ -25,85 +25,141 @@ const COLORS = {
   error: '#FF6B6B'
 };
 
-export default function ProfileScreen() {
-  const { userPoints } = usePoints();
+export default function ProfileScreen({ navigation }: any) {
+  const { user, loading } = useUser();
+  const { signOut } = useAuth();
+  const [bmi, setBmi] = useState<string>('0');
 
-  // Datos fijos (Lectura)
-  const user = {
-    name: 'Juanito Alcachofa',
-    email: 'juanito.alcachofa@email.com',
-    age: '28',
-    weight: '70',
-    height: '175',
-    goal: 'Perder peso',
-    allergies: 'Ninguna',
+  useEffect(() => {
+    if (user?.peso && user?.altura) {
+      const h = parseFloat(user.altura) / 100;
+      const w = parseFloat(user.peso);
+      const calculatedBMI = h > 0 ? (w / (h * h)).toFixed(1) : "0";
+      setBmi(calculatedBMI);
+    }
+  }, [user]);
+
+  const handleLogout = async () => {
+    await signOut();
   };
 
-  const calculateBMI = () => {
-    const h = parseFloat(user.height) / 100;
-    const w = parseFloat(user.weight);
-    return h > 0 ? (w / (h * h)).toFixed(1) : "0";
-  };
+  const InfoRow = ({ label, icon, value }: { label: string, icon: any, value: string }) => (
+    <View style={styles.row}>
+      <View style={styles.rowLeft}>
+        <Ionicons name={icon} size={20} color={COLORS.primary} />
+        <Text style={styles.rowLabel}>{label}</Text>
+      </View>
+      <Text style={styles.rowValue}>{value || 'No registrado'}</Text>
+    </View>
+  );
+
+  const calculateAge = (fechaNacimiento: string) => {
+  if (!fechaNacimiento) return '';
+  const birthDate = new Date(fechaNacimiento);
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return `${age} años`;
+};
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={styles.loadingText}>Cargando perfil...</Text>
+      </View>
+    );
+  }
+
+  if (!user) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Ionicons name="alert-circle-outline" size={50} color={COLORS.error} />
+        <Text style={styles.errorText}>No se pudo cargar el perfil</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={() => navigation.navigate('Dashboard')}>
+          <Text style={styles.retryText}>Volver al inicio</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
       
-      {/* HEADER FIJO */}
       <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Ionicons name="arrow-back-outline" size={24} color={COLORS.primary} />
+        </TouchableOpacity>
         <View style={styles.brandContainer}>
           <Text style={styles.brandName}>MI PERFIL</Text>
           <View style={styles.underlineSmall} />
         </View>
+        <View style={styles.placeholder} />
       </View>
 
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
         
-        {/* SECCIÓN HERO (FOTO Y NOMBRE) - SIN SOLAPAMIENTO */}
         <View style={styles.heroSection}>
           <View style={styles.avatarWrapper}>
             <Image 
-              source={require('../../assets/usu.webp')} 
+              source={user.foto_perfil === 'default_avatar.png' || user.foto_perfil === 'usu.webp'
+                ? require('../../assets/usu.webp') 
+                : { uri: user.foto_perfil }}
               style={styles.avatar} 
             />
           </View>
-          <Text style={styles.nameText}>{user.name}</Text>
-          <Text style={styles.emailText}>{user.email}</Text>
+          <Text style={styles.nameText}>
+            {user.nombre} {user.apellido}
+          </Text>
+          <Text style={styles.emailText}>{user.correo}</Text>
+          <View style={styles.userBadge}>
+            <Ionicons name="person-circle-outline" size={16} color={COLORS.primary} />
+            <Text style={styles.userBadgeText}>PACIENTE</Text>
+          </View>
         </View>
 
-        {/* TARJETAS DE ESTADÍSTICAS GLOBALES */}
+        {/* ESTADÍSTICAS - DISEÑO ORIGINAL EXACTO */}
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
             <MaterialCommunityIcons name="star-circle" size={32} color={COLORS.primary} />
-            <Text style={styles.statVal}>{userPoints}</Text>
+            <Text style={styles.statVal}>{user.puntos_totales || 0}</Text>
             <Text style={styles.statLab}>PUNTOS TOTALES</Text>
           </View>
           
           <View style={styles.statCard}>
             <MaterialCommunityIcons name="scale-bathroom" size={32} color={COLORS.primary} />
-            <Text style={styles.statVal}>{calculateBMI()}</Text>
+            <Text style={styles.statVal}>{bmi}</Text>
             <Text style={styles.statLab}>MI IMC ACTUAL</Text>
           </View>
         </View>
 
-        {/* BLOQUE DE INFORMACIÓN (SOLO LECTURA) */}
+        {/* INFORMACIÓN PERSONAL - DISEÑO ORIGINAL EXACTO */}
         <View style={styles.infoBox}>
           <Text style={styles.sectionTitle}>DATOS PERSONALES</Text>
           
-          <InfoRow label="Edad" icon="calendar-outline" value={`${user.age} años`} />
-          <InfoRow label="Peso" icon="speedometer-outline" value={`${user.weight} kg`} />
-          <InfoRow label="Altura" icon="resize-outline" value={`${user.height} cm`} />
+          <InfoRow label="Nombre de usuario" icon="at-outline" value={user.nombre_usuario} />
+          <InfoRow label="Teléfono" icon="call-outline" value={user.numero_celular} />
+          <InfoRow label="Peso" icon="speedometer-outline" value={user.peso ? `${user.peso} kg` : ''} />
+          <InfoRow label="Altura" icon="resize-outline" value={user.altura ? `${user.altura} cm` : ''} />
+          <InfoRow label="Edad" icon="calendar-outline" value={calculateAge(user.fecha_nacimiento)} />
+          <InfoRow label="Género" icon="person-outline" value={user.genero === 'masculino' ? 'Masculino' : user.genero === 'femenino' ? 'Femenino' : 'Otro'} />
           
           <View style={{ marginTop: 20 }}>
             <Text style={styles.sectionTitle}>METAS Y SALUD</Text>
-            <InfoRow label="Objetivo" icon="trophy-outline" value={user.goal} />
-            <InfoRow label="Alergias" icon="medical-outline" value={user.allergies} />
+            <InfoRow label="Objetivo" icon="trophy-outline" value={user.objetivo || 'Ninguna'} />
+            <InfoRow label="Alergias" icon="medical-outline" value={user.alergias || 'Ninguna'} />
           </View>
         </View>
 
-        {/* CERRAR SESIÓN */}
+        {/* CERRAR SESIÓN - DISEÑO ORIGINAL EXACTO */}
         <View style={styles.footer}>
-          <Text style={styles.logoutText}>Cerrar Sesión</Text>
+          <TouchableOpacity onPress={handleLogout}>
+            <Text style={styles.logoutText}>Cerrar Sesión</Text>
+          </TouchableOpacity>
         </View>
         
         <View style={{ height: 40 }} />
@@ -112,19 +168,19 @@ export default function ProfileScreen() {
   );
 }
 
-// Componente para filas de información fija
-const InfoRow = ({ label, icon, value }: { label: string, icon: any, value: string }) => (
-  <View style={styles.row}>
-    <View style={styles.rowLeft}>
-      <Ionicons name={icon} size={20} color={COLORS.primary} />
-      <Text style={styles.rowLabel}>{label}</Text>
-    </View>
-    <Text style={styles.rowValue}>{value}</Text>
-  </View>
-);
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.white },
+  loadingContainer: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    backgroundColor: COLORS.secondary 
+  },
+  loadingText: { marginTop: 10, color: COLORS.textLight },
+  errorText: { marginTop: 10, color: COLORS.error, fontWeight: '600' },
+  retryButton: { marginTop: 20, padding: 15, backgroundColor: COLORS.primary, borderRadius: 10 },
+  retryText: { color: COLORS.white, fontWeight: 'bold' },
+  
   header: {
     height: 70,
     backgroundColor: COLORS.white,
@@ -157,9 +213,41 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 6,
   },
-  avatar: { width: 110, height: 110, borderRadius: 55, borderWidth: 4, borderColor: COLORS.primary },
-  nameText: { fontSize: 24, fontWeight: '900', color: COLORS.textDark, marginTop: 15 },
-  emailText: { fontSize: 14, color: COLORS.textLight, opacity: 0.7, fontWeight: '600' },
+  avatar: { 
+    width: 110, 
+    height: 110, 
+    borderRadius: 55, 
+    borderWidth: 4, 
+    borderColor: COLORS.primary 
+  },
+  nameText: { 
+    fontSize: 24, 
+    fontWeight: '900', 
+    color: COLORS.textDark, 
+    marginTop: 15 
+  },
+  emailText: { 
+    fontSize: 14, 
+    color: COLORS.textLight, 
+    opacity: 0.7, 
+    fontWeight: '600', 
+    marginTop: 2 
+  },
+  userBadge: { 
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.secondary, 
+    paddingHorizontal: 15, 
+    paddingVertical: 6, 
+    borderRadius: 20,
+    marginTop: 10,
+  },
+  userBadgeText: { 
+    fontSize: 12, 
+    fontWeight: '800', 
+    color: COLORS.primary,
+    marginLeft: 5
+  },
 
   statsRow: {
     flexDirection: 'row',
@@ -169,7 +257,7 @@ const styles = StyleSheet.create({
   },
   statCard: {
     backgroundColor: COLORS.white,
-    width: width * 0.43,
+    width: '43%',
     paddingVertical: 20,
     borderRadius: 25,
     alignItems: 'center',
